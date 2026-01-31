@@ -1,0 +1,140 @@
+-- ==========================================================
+-- 🦆 鴨嘴獸腳本 - V3.4 強化戰鬥版
+-- ✅ 更新：V3 / V4 / 武裝色 (Haki) 自動化邏輯
+-- ✅ 優化：使用 Heartbeat 同步檢查，更精準穩定
+-- ==========================================================
+
+local players = game:GetService("Players")
+local rs = game:GetService("RunService")
+local uis = game:GetService("UserInputService") 
+local lp = players.LocalPlayer
+local lighting = game:GetService("Lighting")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local workspace = game:GetService("Workspace")
+
+-- 全域變數初始化
+_G.AutoHakiEnabled = false
+_G.AutoV3Enabled = false
+_G.AutoV4Enabled = false
+_G.FastAttackEnabled = false
+
+local FastAttackConfig = {Distance = 25000, Delay = 0.1}
+local layoutOrder = 0
+
+-- 1. 核心邏輯：V3 / V4 / Haki (你提供的新邏輯)
+task.spawn(function()
+    while true do
+        rs.Heartbeat:Wait()
+        local char = lp.Character
+        if char and char:FindFirstChildOfClass("Humanoid") and char:FindFirstChildOfClass("Humanoid").Health > 0 then
+            -- 自動武裝色 (Haki)
+            if _G.AutoHakiEnabled and not char:FindFirstChild("HasBuso") then
+                pcall(function() ReplicatedStorage.Remotes.CommF_:InvokeServer("Buso") end)
+            end
+            -- 自動 V3 技能
+            if _G.AutoV3Enabled then 
+                pcall(function() ReplicatedStorage.Remotes.CommE:FireServer("ActivateAbility") end) 
+            end
+            -- 自動 V4 覺醒
+            if _G.AutoV4Enabled then
+                local awk = lp.Backpack:FindFirstChild("Awakening") or char:FindFirstChild("Awakening")
+                if awk and awk:FindFirstChild("RemoteFunction") then 
+                    pcall(function() awk.RemoteFunction:InvokeServer(true) end) 
+                end
+            end
+        end
+    end
+end)
+
+-- 2. 核心邏輯：快速攻擊
+local function PerformFastAttack()
+    local Net = ReplicatedStorage:FindFirstChild("Modules") and ReplicatedStorage.Modules:FindFirstChild("Net")
+    local RegAttack = Net and Net:FindFirstChild("RE/RegisterAttack")
+    local RegHit = Net and Net:FindFirstChild("RE/RegisterHit")
+    local Enemies = workspace:FindFirstChild("Enemies")
+    if not (RegAttack and RegHit) then return end
+
+    local OthersEnemies = {}
+    if Enemies then
+        for _, v in pairs(Enemies:GetChildren()) do
+            local hum = v:FindFirstChildOfClass("Humanoid")
+            if hum and hum.Health > 0 then
+                local root = v:FindFirstChild("HumanoidRootPart")
+                if root and lp:DistanceFromCharacter(root.Position) < FastAttackConfig.Distance then
+                    table.insert(OthersEnemies, {v, root})
+                end
+            end
+        end
+    end
+    if #OthersEnemies > 0 then
+        RegAttack:FireServer(FastAttackConfig.Delay)
+        RegHit:FireServer(OthersEnemies[1][2], OthersEnemies)
+    end
+end
+
+task.spawn(function()
+    while true do
+        if _G.FastAttackEnabled then PerformFastAttack() end
+        task.wait(FastAttackConfig.Delay)
+    end
+end)
+
+-- 3. UI 構建與拖動
+local targetParent = (game:GetService("CoreGui"):FindFirstChild("RobloxGui") and game:GetService("CoreGui")) or lp:WaitForChild("PlayerGui")
+if targetParent:FindFirstChild("Duckbill_V34_Final") then targetParent.Duckbill_V34_Final:Destroy() end
+
+local sg = Instance.new("ScreenGui", targetParent); sg.Name = "Duckbill_V34_Final"; sg.ResetOnSpawn = false
+local DuckBtn = Instance.new("ImageButton", sg); DuckBtn.Size = UDim2.new(0, 60, 0, 60); DuckBtn.Position = UDim2.new(0, 30, 0, 150); DuckBtn.BackgroundTransparency = 1; DuckBtn.Image = "rbxassetid://6804018318" 
+
+local Menu = Instance.new("Frame", sg); Menu.Size = UDim2.new(0, 280, 0, 450); Menu.Position = UDim2.fromScale(0.5, 0.5); Menu.AnchorPoint = Vector2.new(0.5, 0.5); Menu.BackgroundColor3 = Color3.fromRGB(255, 255, 255); Menu.Visible = true; Instance.new("UICorner", Menu)
+local Title = Instance.new("TextLabel", Menu); Title.Size = UDim2.new(1, 0, 0, 45); Title.Text = "DUCKBILL HUB V3.4"; Title.TextColor3 = Color3.fromRGB(40, 40, 40); Title.BackgroundColor3 = Color3.fromRGB(245, 245, 245); Title.Font = Enum.Font.GothamBold; Title.TextSize = 14; Instance.new("UICorner", Title)
+
+-- 拖動功能
+local function MakeDraggable(gui)
+    gui.Active = true
+    local dragging, dragInput, dragStart, startPos
+    gui.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true; dragStart = input.Position; startPos = gui.Position
+            input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end)
+        end
+    end)
+    gui.InputChanged:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end end)
+    rs.RenderStepped:Connect(function() if dragging and dragInput then local delta = dragInput.Position - dragStart; gui.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y) end end)
+end
+MakeDraggable(Menu)
+
+local container = Instance.new("ScrollingFrame", Menu); container.Size = UDim2.new(1, -20, 1, -60); container.Position = UDim2.new(0, 10, 0, 55); container.BackgroundTransparency = 1; container.CanvasSize = UDim2.new(0, 0, 0, 650); container.ScrollBarThickness = 0
+local layout = Instance.new("UIListLayout", container); layout.Padding = UDim.new(0, 8); layout.HorizontalAlignment = Enum.HorizontalAlignment.Center; layout.SortOrder = Enum.SortOrder.LayoutOrder
+
+-- 4. 按鈕工廠
+local function CreateDivider(text)
+    layoutOrder = layoutOrder + 1
+    local lab = Instance.new("TextLabel", container); lab.LayoutOrder = layoutOrder; lab.Size = UDim2.new(0.9, 0, 0, 25); lab.Text = "--- " .. text .. " ---"; lab.TextColor3 = Color3.fromRGB(180, 180, 180); lab.BackgroundTransparency = 1; lab.Font = Enum.Font.Gotham; lab.TextSize = 10
+end
+
+local function CreateToggleBtn(name, callback)
+    layoutOrder = layoutOrder + 1
+    local state = false
+    local btn = Instance.new("TextButton", container); btn.LayoutOrder = layoutOrder; btn.Size = UDim2.new(0.95, 0, 0, 40); btn.BackgroundColor3 = Color3.fromRGB(255, 255, 255); btn.Text = name; btn.TextColor3 = Color3.fromRGB(0, 0, 0); btn.Font = Enum.Font.GothamBold; btn.TextSize = 12; Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+    btn.MouseButton1Click:Connect(function()
+        state = not state
+        btn.BackgroundColor3 = state and Color3.fromRGB(50, 180, 80) or Color3.fromRGB(255, 255, 255)
+        btn.TextColor3 = state and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(0, 0, 0)
+        btn.Text = state and name .. " (已開啟) ✔️" or name
+        callback(state)
+    end)
+end
+
+-- 5. 初始化介面內容
+CreateDivider("戰鬥")
+CreateToggleBtn("快速攻擊", function(s) _G.FastAttackEnabled = s end)
+CreateToggleBtn("自動武裝色", function(s) _G.AutoHakiEnabled = s end)
+CreateToggleBtn("自動 V3 技能", function(s) _G.AutoV3Enabled = s end)
+CreateToggleBtn("自動 V4 覺醒", function(s) _G.AutoV4Enabled = s end)
+
+-- 開關切換
+uis.InputBegan:Connect(function(i, g) if not g and i.KeyCode == Enum.KeyCode.P then Menu.Visible = not Menu.Visible end end)
+DuckBtn.MouseButton1Click:Connect(function() Menu.Visible = not Menu.Visible end)
+
+print("🦆 Duckbill Hub V3.4: Auto V3/V4/Haki Integrated!")
