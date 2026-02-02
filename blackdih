@@ -1,174 +1,127 @@
--- ==========================================================
--- 🦆 鴨嘴獸腳本 - V3.4 終極全方位強化版 (Net Attack Edition)
--- ✅ 戰鬥：嵌入 Net 協議快速攻擊 (RegisterHit)
--- ✅ 功能：秒殺、ESP Pro、自動 V3/V4、全功能 UI
--- ✅ 規範：Y 鍵收起、右上灰叉刪除、滑鼠全屏拖拽
--- ==========================================================
+--[[
+    🦆 鴨嘴獸直掛式介面 3.6.4 - 精簡優化版
+    ✅ 選項：全目標快攻、秒殺(防卡)、飛行(1上2下)、提升飛行速(+)、FPS灰色優化
+    製作人: salmomydog
+--]]
 
-local players = game:GetService("Players")
-local rs = game:GetService("RunService")
-local uis = game:GetService("UserInputService") 
-local lp = players.LocalPlayer
+local UIS = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local lp = Players.LocalPlayer
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
--- [1. 初始化配置]
-_G.DuckbillRunning = true 
-_G.Config = {
-    AutoHaki = false, AutoV3 = false, AutoV4 = false,
-    FastAttack = false, OneKill = false, 
-    Fly = false, FlySpeed = 2, 
-    ESPEnabled = false, FPSBoost = false
-}
+local SG = Instance.new("ScreenGui", game:GetService("CoreGui")); SG.Name = "Platypus_V364_Slim"
+local Main = Instance.new("Frame", SG); Main.Size = UDim2.new(0, 260, 0, 420); Main.Position = UDim2.new(0.05, 0, 0.2, 0); Main.BackgroundColor3 = Color3.new(1, 1, 1); Main.BorderSizePixel = 0; Main.Active = true
 
-local espStore = {}
-local movingUp, movingDown = false, false
-local flyBV, flyBG = nil, nil
+-- 標題與叉叉
+local Title = Instance.new("TextLabel", Main); Title.Size = UDim2.new(1, 0, 0, 50); Title.Text = "鴨嘴獸腳本 3.6.4"; Title.Font = "SourceSansBold"; Title.TextSize = 20; Title.BackgroundTransparency = 1
+local Close = Instance.new("TextButton", Main); Close.Size = UDim2.new(0, 28, 0, 28); Close.Position = UDim2.new(1, -35, 0, 12); Close.BackgroundColor3 = Color3.fromRGB(200, 200, 200); Close.Text = "X"; Close.BorderSizePixel = 0; Close.MouseButton1Click:Connect(function() SG:Destroy() end)
 
--- [2. 核心功能邏輯]
+-- 滾動容器
+local Container = Instance.new("ScrollingFrame", Main); Container.Size = UDim2.new(1, -20, 1, -80); Container.Position = UDim2.new(0, 10, 0, 65); Container.BackgroundTransparency = 1; Container.BorderSizePixel = 0; Container.CanvasSize = UDim2.new(0, 0, 2, 0)
+Instance.new("UIListLayout", Container).Padding = UDim.new(0, 10)
 
--- A. 嵌入你要求的 Net 快速攻擊
-task.spawn(function()
-    local _ENV = (getgenv or getrenv or getfenv)()
-    local Settings = {AutoClick = true, ClickDelay = 0}
-    while _G.DuckbillRunning do
-        task.wait(Settings.ClickDelay)
-        if _G.Config.FastAttack then
-            pcall(function()
-                local Net = ReplicatedStorage:WaitForChild("Modules"):FindFirstChild("Net")
-                local RegisterAttack = Net and Net:FindFirstChild("RE/RegisterAttack")
-                local RegisterHit = Net and Net:FindFirstChild("RE/RegisterHit")
-                local Enemies = workspace:FindFirstChild("Enemies")
-                if RegisterAttack and RegisterHit then
-                    local OthersEnemies = {}
-                    for _, v in pairs(Enemies:GetChildren()) do
-                        if v:FindFirstChildOfClass("Humanoid") and v:FindFirstChildOfClass("Humanoid").Health > 0 then
-                            local parts = v:GetDescendants()
-                            local validParts = {}
-                            for _, part in ipairs(parts) do if part:IsA("BasePart") and part.CanCollide then table.insert(validParts, part) end end
-                            local p = #validParts > 0 and validParts[math.random(1, #validParts)] or v:FindFirstChild("HumanoidRootPart")
-                            if p and lp:DistanceFromCharacter(p.Position) < 25000 then table.insert(OthersEnemies, {v, p}) end
-                        end
-                    end
-                    if #OthersEnemies > 0 then
-                        RegisterAttack:FireServer(Settings.ClickDelay)
-                        RegisterHit:FireServer(OthersEnemies[1][2], OthersEnemies)
-                    end
-                end
-            end)
-        end
-    end
-end)
+-- 拖曳與 Y 鍵
+local d, s, p; Main.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then d=true s=i.Position p=Main.Position end end)
+UIS.InputChanged:Connect(function(i) if d and i.UserInputType == Enum.UserInputType.MouseMovement then local delta=i.Position-s Main.Position=UDim2.new(p.X.Scale,p.X.Offset+delta.X,p.Y.Scale,p.Y.Offset+delta.Y) end end)
+UIS.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then d=false end end)
+UIS.InputBegan:Connect(function(i, proc) if not proc and i.KeyCode == Enum.KeyCode.Y then Main.Visible = not Main.Visible end end)
 
--- B. 完美懸停飛行
-task.spawn(function()
-    while _G.DuckbillRunning do
-        rs.Heartbeat:Wait()
-        local char = lp.Character
-        if _G.Config.Fly and char then
-            local hrp = char:FindFirstChild("HumanoidRootPart")
-            local hum = char:FindFirstChildOfClass("Humanoid")
-            if hrp and hum then
-                for _, v in pairs(char:GetDescendants()) do if v:IsA("BasePart") then v.CanCollide = false end end
-                hum.PlatformStand = true
-                if not hrp:FindFirstChild("DuckFlyForce") then
-                    flyBV = Instance.new("BodyVelocity", hrp); flyBV.Name = "DuckFlyForce"; flyBV.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-                    flyBG = Instance.new("BodyGyro", hrp); flyBG.Name = "DuckFlyGyro"; flyBG.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-                end
-                local velocity = hum.MoveDirection * (_G.Config.FlySpeed * 40)
-                if movingUp then velocity = velocity + Vector3.new(0, 80, 0) elseif movingDown then velocity = velocity + Vector3.new(0, -80, 0) end
-                flyBV.Velocity = velocity; flyBG.CFrame = workspace.CurrentCamera.CFrame
-            end
-        elseif char and char:FindFirstChild("HumanoidRootPart") then
-            if char.HumanoidRootPart:FindFirstChild("DuckFlyForce") then char.HumanoidRootPart.DuckFlyForce:Destroy() end
-            if char.HumanoidRootPart:FindFirstChild("DuckFlyGyro") then char.HumanoidRootPart.DuckFlyGyro:Destroy() end
-            char:FindFirstChildOfClass("Humanoid").PlatformStand = false
-        end
-    end
-end)
-
--- C. 自動化、秒殺與 ESP 資訊 (補回 OneKill)
-task.spawn(function()
-    while _G.DuckbillRunning do
-        task.wait(0.3)
-        local char = lp.Character
-        if char then
-            if _G.Config.AutoHaki and not char:FindFirstChild("HasBuso") then pcall(function() ReplicatedStorage.Remotes.CommF_:InvokeServer("Buso") end) end
-            if _G.Config.AutoV3 then pcall(function() ReplicatedStorage.Remotes.CommE:FireServer("ActivateAbility") end) end
-            if _G.Config.AutoV4 then pcall(function() ReplicatedStorage.Remotes.CommF_:InvokeServer("Awaken") end) end
-            if _G.Config.OneKill and char:FindFirstChild("HumanoidRootPart") then
-                local hrp = char.HumanoidRootPart
-                if hrp:FindFirstChild("SwordDanceAttack") or hrp:FindFirstChild("TridentDoughZ2") then
-                    local old = hrp.CFrame; hrp.CFrame = CFrame.new(0, -100000, 0); task.wait(); hrp.CFrame = old
-                end
-            end
-        end
-        if _G.Config.ESPEnabled then
-            for _, p in pairs(players:GetPlayers()) do
-                if p ~= lp and p.Character and p.Character:FindFirstChild("Head") then
-                    if not espStore[p] then
-                        local b = Instance.new("BillboardGui", p.Character.Head); b.Size = UDim2.new(0, 100, 0, 70); b.AlwaysOnTop = true; b.StudsOffset = Vector3.new(0, 3, 0)
-                        local t = Instance.new("TextLabel", b); t.Size = UDim2.new(1, 0, 1, 0); t.BackgroundTransparency = 1; t.TextColor3 = Color3.new(1, 0, 0); t.TextScaled = true; t.Font = "Code"
-                        espStore[p] = t
-                    end
-                    local dist = math.floor((p.Character.PrimaryPart.Position - lp.Character.PrimaryPart.Position).Magnitude)
-                    espStore[p].Text = p.DisplayName .. "\n[" .. dist .. "m]\nHP: " .. math.floor(p.Character.Humanoid.Health)
-                end
-            end
-        else for p, v in pairs(espStore) do pcall(function() v.Parent:Destroy() end) end; espStore = {} end
-    end
-end)
-
--- [3. UI 介面注入] (補回消失的所有按鈕)
-local target = (game:GetService("CoreGui"):FindFirstChild("RobloxGui") and game:GetService("CoreGui")) or lp.PlayerGui
-if target:FindFirstChild("Duckbill_V34_Final") then target.Duckbill_V34_Final:Destroy() end
-local sg = Instance.new("ScreenGui", target); sg.Name = "Duckbill_V34_Final"; sg.ResetOnSpawn = false
-
-local Menu = Instance.new("Frame", sg); Menu.Size = UDim2.new(0, 320, 0, 520); Menu.Position = UDim2.fromScale(0.5, 0.5); Menu.AnchorPoint = Vector2.new(0.5, 0.5); Menu.BackgroundColor3 = Color3.new(1, 1, 1); Instance.new("UICorner", Menu)
-local Title = Instance.new("TextLabel", Menu); Title.Size = UDim2.new(1, -40, 0, 45); Title.Text = " 🦆 鴨嘴獸腳本 V3.4 旗艦版"; Title.Font = "GothamBold"; Title.Position = UDim2.new(0, 10, 0, 0); Title.BackgroundTransparency = 1; Title.TextXAlignment = 0
-local CloseBtn = Instance.new("TextButton", Menu); CloseBtn.Size = UDim2.new(0, 25, 0, 25); CloseBtn.Position = UDim2.new(1, -30, 0, 10); CloseBtn.Text = "×"; CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 200, 200); Instance.new("UICorner", CloseBtn)
-
--- 拖拽
-local d=false;local s;local sp;Menu.InputBegan:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 then d=true;s=i.Position;sp=Menu.Position end end)
-uis.InputChanged:Connect(function(i) if d and i.UserInputType==Enum.UserInputType.MouseMovement then local delta=i.Position-s;Menu.Position=UDim2.new(sp.X.Scale,sp.X.Offset+delta.X,sp.Y.Scale,sp.Y.Offset+delta.Y) end end)
-uis.InputEnded:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 then d=false end end)
-
-local container = Instance.new("ScrollingFrame", Menu); container.Size = UDim2.new(1, -20, 1, -60); container.Position = UDim2.new(0, 10, 0, 50); container.BackgroundTransparency = 1; container.ScrollBarThickness = 0
-Instance.new("UIListLayout", container).Padding = UDim.new(0, 7)
-
-local function AddToggle(name, key, callback)
-    local btn = Instance.new("TextButton", container); btn.Size = UDim2.new(0.95, 0, 0, 38); btn.Text = name; btn.BackgroundColor3 = Color3.new(1, 1, 1); Instance.new("UICorner", btn)
-    btn.MouseButton1Click:Connect(function()
-        _G.Config[key] = not _G.Config[key]
-        if callback then callback(_G.Config[key]) end
-        btn.BackgroundColor3 = _G.Config[key] and Color3.fromRGB(50, 180, 80) or Color3.new(1, 1, 1)
-        btn.TextColor3 = _G.Config[key] and Color3.new(1, 1, 1) or Color3.new(0, 0, 0)
-    end)
+local function AddButton(name, callback)
+    local btn = Instance.new("TextButton", Container)
+    btn.Size = UDim2.new(1, 0, 0, 48); btn.BackgroundColor3 = Color3.new(1, 1, 1); btn.BorderSizePixel = 1; btn.BorderColor3 = Color3.fromRGB(230, 230, 230); btn.Text = name; btn.Font = "SourceSansBold"; btn.TextSize = 18
+    local active = false
+    btn.MouseButton1Click:Connect(function() active = not active btn.BackgroundColor3 = active and Color3.new(0, 1, 0) or Color3.new(1, 1, 1) callback(active) end)
+    return btn
 end
 
-AddToggle("快速攻擊 (Net 強化)", "FastAttack")
-AddToggle("秒殺攻擊 (特定技能)", "OneKill")
-AddToggle("透視玩家 (ESP Pro)", "ESPEnabled")
-AddToggle("穿牆飛行 (1上/2下)", "Fly")
-
-local SpdBtn = Instance.new("TextButton", container); SpdBtn.Size = UDim2.new(0.95, 0, 0, 38); SpdBtn.Text = "飛行速度係數: " .. _G.Config.FlySpeed; SpdBtn.BackgroundColor3 = Color3.fromRGB(240, 240, 240); Instance.new("UICorner", SpdBtn)
-SpdBtn.MouseButton1Click:Connect(function() _G.Config.FlySpeed = (_G.Config.FlySpeed >= 10) and 1 or _G.Config.FlySpeed + 1; SpdBtn.Text = "飛行速度係數: " .. _G.Config.FlySpeed end)
-
-AddToggle("自動 V4 覺醒", "AutoV4")
-AddToggle("自動 V3 技能", "AutoV3")
-AddToggle("自動武裝色", "AutoHaki")
-AddToggle("暴力 FPS 優化", "FPSBoost", function(s)
-    if s then settings().Rendering.QualityLevel = 1; for _,v in pairs(game:GetDescendants()) do pcall(function() if v:IsA("Decal") or v:IsA("Texture") or v:IsA("ParticleEmitter") then v:Destroy() end end) end end
-end)
-
-uis.InputBegan:Connect(function(i, g)
-    if not g then
-        if i.KeyCode == Enum.KeyCode.Y then Menu.Visible = not Menu.Visible end
-        if i.KeyCode == Enum.KeyCode.One then movingUp = true end
-        if i.KeyCode == Enum.KeyCode.Two then movingDown = true end
+-- --- 1. 全目標快速攻擊 (NPC + 玩家) ---
+local fastAtk = false
+task.spawn(function()
+    while true do RunService.Heartbeat:Wait()
+        if fastAtk then pcall(function()
+            local Net = ReplicatedStorage.Modules.Net
+            local Enemies = workspace:FindFirstChild("Enemies")
+            local Targets = {}
+            if Enemies then for _, v in pairs(Enemies:GetChildren()) do if v:FindFirstChild("Humanoid") and v.Humanoid.Health > 0 then table.insert(Targets, v) end end end
+            for _, plr in pairs(Players:GetPlayers()) do if plr ~= lp and plr.Character and plr.Character:FindFirstChild("Humanoid") and plr.Character.Humanoid.Health > 0 then table.insert(Targets, plr.Character) end end
+            for _, t in pairs(Targets) do
+                local r = t:FindFirstChild("HumanoidRootPart")
+                if r and lp:DistanceFromCharacter(r.Position) < 25000 then
+                    Net["RE/RegisterAttack"]:FireServer(0)
+                    Net["RE/RegisterHit"]:FireServer(r, {{t, r}})
+                end
+            end
+        end) end
     end
 end)
-uis.InputEnded:Connect(function(i)
-    if i.KeyCode == Enum.KeyCode.One then movingUp = false end
-    if i.KeyCode == Enum.KeyCode.Two then movingDown = false end
+AddButton("全目標快速攻擊", function(state) fastAtk = state end)
+
+-- --- 2. 秒殺功能 (防卡死優化版) ---
+local oneKill, currentChar, isTP, cdAct = false, nil, false, false
+local function doSafeTP(hrp)
+    if isTP then return end; isTP = true
+    local start = os.clock()
+    hrp.Velocity = Vector3.new(0,0,0) -- 傳送前清空速度防彈飛
+    local conn; conn = RunService.Heartbeat:Connect(function()
+        if os.clock()-start >= 0.3 or not currentChar or not currentChar.Parent then 
+            conn:Disconnect(); isTP = false; return 
+        end
+        hrp.CFrame = CFrame.new(0, -190000, 0) 
+    end)
+end
+task.spawn(function()
+    while true do RunService.Heartbeat:Wait()
+        if oneKill and not cdAct and not isTP and lp.Character then
+            currentChar = lp.Character
+            local hrp = currentChar:FindFirstChild("HumanoidRootPart")
+            if hrp and (hrp:FindFirstChild("SwordDanceAttack") or hrp:FindFirstChild("TridentDoughZ2") or hrp:FindFirstChild("Buddha2Pickup")) then
+                local dly = (hrp:FindFirstChild("TridentDoughZ2") and 0.8) or 0.25
+                cdAct = true; task.delay(4.5, function() cdAct = false end)
+                task.delay(dly, function() doSafeTP(hrp) end)
+            end
+        end
+    end
 end)
-CloseBtn.MouseButton1Click:Connect(function() sg:Destroy(); _G.DuckbillRunning = false end)
+AddButton("秒殺 (防卡死歸航版)", function(state) oneKill = state end)
+
+-- --- 3. 飛行控制與速度提升 ---
+local flyActive, flySpeed, moveUp, moveDown = false, 1, false, false
+UIS.InputBegan:Connect(function(i, p) if not p then if i.KeyCode == Enum.KeyCode.One then moveUp = true elseif i.KeyCode == Enum.KeyCode.Two then moveDown = true end end end)
+UIS.InputEnded:Connect(function(i, p) if i.KeyCode == Enum.KeyCode.One then moveUp = false elseif i.KeyCode == Enum.KeyCode.Two then moveDown = false end end)
+
+task.spawn(function()
+    while true do RunService.Heartbeat:Wait()
+        local hrp = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
+        if flyActive and hrp and not isTP then
+            if not hrp:FindFirstChild("DuckV") then
+                Instance.new("BodyVelocity", hrp).Name = "DuckV"; Instance.new("BodyGyro", hrp).Name = "DuckG"
+                hrp.DuckV.MaxForce = Vector3.new(1,1,1)*math.huge; hrp.DuckG.MaxTorque = Vector3.new(1,1,1)*math.huge
+            end
+            local vel = lp.Character.Humanoid.MoveDirection * (flySpeed * 30)
+            if moveUp then vel = vel + Vector3.new(0, 50, 0) elseif moveDown then vel = vel + Vector3.new(0, -50, 0) end
+            hrp.DuckV.Velocity = vel; hrp.DuckG.CFrame = workspace.CurrentCamera.CFrame
+        elseif hrp and hrp:FindFirstChild("DuckV") then hrp.DuckV:Destroy(); hrp.DuckG:Destroy() end
+    end
+end)
+AddButton("飛行開啟 [1上升/2下降]", function(state) flyActive = state end)
+
+-- 單一速度提升按鈕 (越按越快)
+AddButton("提升飛行速度 (+)", function() 
+    flySpeed = flySpeed + 3 
+    print("當前飛行倍率:", flySpeed)
+end)
+
+-- --- 4. 極致 FPS 灰色優化 ---
+AddButton("FPS 灰色模式", function(state)
+    if state then
+        for _, v in pairs(game:GetDescendants()) do
+            if v:IsA("Part") or v:IsA("MeshPart") or v:IsA("UnionOperation") then
+                v.Material = Enum.Material.Plastic; v.Color = Color3.fromRGB(120, 120, 120); v.Reflectance = 0
+            elseif v:IsA("Decal") or v:IsA("Texture") or v:IsA("ParticleEmitter") then v:Destroy() end
+        end
+        game:GetService("Lighting").GlobalShadows = false
+    end
+end)
+
+print("鴨嘴獸 3.6.4 精簡版啟動成功！")
